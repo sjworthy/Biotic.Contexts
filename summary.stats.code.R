@@ -1,5 +1,11 @@
 library(vegan)
-library(hillR)
+library(hillR) # not good for hill numbers
+install.packages("mFD")
+library(diverse)
+library(sjPlot)
+library(ggplot2)
+library(rstanarm)
+library(cowplot)
 
 setwd("~/Desktop/Biotic.Impacts/Data")
 
@@ -104,6 +110,12 @@ all.abund.cdm=read.csv("all.abund.cdm.csv", header=T, row.names = 1)
 all.abund.cdm=read.csv("all.abund.cdm.csv", header=T, row.names = 1)
 abund.cdm=read.csv("abund.cdm.csv", header = T, row.names = 1)
 
+diverse.output=diversity(as.matrix(abund.cdm), type = "all", q=1) # same as HillR
+diverse.output.all=diversity(as.matrix(all.abund.cdm), type = "all", q=1)
+
+diverse.output.invsimp=diversity(as.matrix(abund.cdm), type = "all", q=2) # same as HillR
+diverse.output.all.invsimp=diversity(as.matrix(all.abund.cdm), type = "all", q=2)
+
 # Calculate species richness
 richness=specnumber(abund.cdm)
 all.richness=specnumber(all.abund.cdm)
@@ -184,8 +196,6 @@ sum(table(output$species))
 # total from both columns should always be 1 less than total to account for self
 
 
-
-
 #### Evaluating model effects ####
 # Read in data used to fit the model
 setwd("/Users/samanthaworthy/Desktop/Biotic.Impacts/Data")
@@ -206,26 +216,29 @@ sig.pos.pca=rgr.sp.pca.parm[rgr.sp.pca.parm$X2.50. > 0 & rgr.sp.pca.parm$X97.50.
 
 
 #### Three-Way interactions ####
-
 # Interaction: PC1*HetNeigh*Treatment
 
-# plot marginal effects of interactions
-# Have to make model in lm first
-library(sjPlot)
-library(ggplot2)
+# run subset of model with rstanarms so easier to plot. Coefficients are the same.
 
 rgr.pca.model$Treatment_factor=as.factor(rgr.pca.model$Treatment_factor)
 rgr.indiv.trait.model$Treatment_factor=as.factor(rgr.indiv.trait.model$Treatment_factor)
 
+pc1.hetneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) + (1|sp_id) + (1|Station_id) +
+      pc_1*log_HetNeigh*Treatment_factor,
+    data = rgr.pca.model,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-pc1.hetneigh.trt.mod=lm(log_RGR_plus_1~pc_1*log_HetNeigh*Treatment_factor, rgr.pca.model)
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+pc1.hetneigh.trt.plot=plot_model(pc1.hetneigh.trt.mod, type="int", 
+                  axis.title = c("PC1","Log RGR"), 
+                  legend.title = "Log Heterospecifc\nNeighbor Density", title = "")
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(pc1.hetneigh.trt.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log HetNeigh", title = "")
+pc1.hetneigh.trt.plot[[4]]
 
-output[[4]]
+ggsave("Figure2.pdf", height=10, width=12)
 
 #### Species-Specific Models
 
@@ -235,16 +248,63 @@ hibros=rgr.pca.model[rgr.pca.model$sp_id==22,]
 schmor=rgr.pca.model[rgr.pca.model$sp_id==51,]
 spomom=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==56,]
 
-alclfo.pc1.conneigh.mod=lm(log_RGR_plus_1~pc_1*log_ConNeigh, alcflo)
-hibros.pc1.conneigh.mod=lm(log_RGR_plus_1~pc_1*log_ConNeigh, hibros)
-schmor.pc1.conneigh.mod=lm(log_RGR_plus_1~pc_1*log_ConNeigh, schmor)
-spomom.LA.conneigh.mod=lm(log_RGR_plus_1~log_LA*log_ConNeigh, spomom)
+alclfo.pc1.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_ConNeigh,
+    data = alcflo,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+alclfo.pc1.conneigh.mod.plot=plot_model(alclfo.pc1.conneigh.mod, type="int", 
+           axis.title = c("PC1","Log RGR"), 
+           legend.title = "Log Conspecific\nNeighbor Density", title = "A. floribunda")
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(alclfo.pc1.conneigh.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
+ggsave("alcflo.pc1.conneigh.pdf", height=10, width=12)
+
+hibros.pc1.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_ConNeigh,
+    data = hibros,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+hibros.pc1.conneigh.mod.plot=plot_model(hibros.pc1.conneigh.mod, type="int", 
+                        axis.title = c("PC1","Log RGR"), 
+                        legend.title = "Log Conspecific\nNeighbor Density", title = "H. rosa-sinensis")
+ggsave("hibros.pc1.conneigh.pdf", height=10, width=12)
+
+schmor.pc1.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 +
+      pc_1*log_ConNeigh,
+    data = schmor, prior = R2(location=0.5),
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+schmor.pc1.conneigh.mod.plot=plot_model(schmor.pc1.conneigh.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Conspecific\nNeighbor Density", title = "S. morototoni")
+ggsave("schmor.pc1.conneigh.pdf", height=10, width=12)
+
+spomom.LA.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*log_ConNeigh,
+    data = spomom,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+spomom.LA.conneigh.mod.plot=plot_model(spomom.LA.conneigh.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Log Conspecific\nNeighbor Density", title = "S. mombin")
+ggsave("spmom.la.conneigh.pdf", height=10, width=12)
+
 
 # Interaction: SMF*ConNeigh(-)
 
@@ -254,23 +314,92 @@ schmor=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==51,]
 guagui=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==19,]
 drygla=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==14,]
 
-alclfo.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, alcflo) # -SMF
-hibros.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, hibros) # -ConNeigh
-schmor.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, schmor) # -ConNeigh
-guagui.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, guagui) # SMF
-drygla.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, drygla) # -SMF and -ConNeigh
+alclfo.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = alcflo,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+alclfo.smf.conneigh.mod.plot=plot_model(alclfo.smf.conneigh.mod, type="int", 
+                        axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                        legend.title = "Log Conspecific\nNeighbor Density", title = "A. floribunda")
+ggsave("alclfo.smf.conneigh.pdf", height=10, width=12)
+
+hibros.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = hibros,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+hibros.smf.conneigh.mod.plot=plot_model(hibros.smf.conneigh.mod, type="int", 
+                        axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                        legend.title = "Log Conspecific\nNeighbor Density", title = "H. rosa-sinensis")
+ggsave("hibros.smf.conneigh.pdf", height=10, width=12)
+
+schmor.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = schmor,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+schmor.smf.conneigh.mod.plot=plot_model(schmor.smf.conneigh.mod, type="int", 
+                       axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                       legend.title = "Log Conspecific\nNeighbor Density", title = "S. morototoni")
+ggsave("schmor.smf.conneigh.pdf", height=10, width=12)
+
+guagui.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = guagui,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+guagui.smf.conneigh.mod.plot=plot_model(guagui.smf.conneigh.mod, type="int", 
+                       axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                       legend.title = "Log Conspecific\nNeighbor Density", title = "G. guidonia")
+ggsave("guagui.smf.conneigh.pdf", height=10, width=12)
 
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(schmor.smf.conneigh.mod, type="int", 
-                  axis.title = c("Stem Mass Fraction (SMF)","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
+drygla.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = drygla,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+drygla.smf.conneigh.mod.plot=plot_model(drygla.smf.conneigh.mod, type="int", 
+                       axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                       legend.title = "Log Conspecific\nNeighbor Density", title = "D. glauca")
+ggsave("drygla.smf.conneigh.pdf", height=10, width=12)
 
 # Interaction: SMF*ConNeigh(+)
 micrac=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==30,]
 
 # model won't compute because ConNeigh value is the same for all individuals despite being in different plots
-micrac.smf.conneigh.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh, micrac)
+
+micrac.smf.conneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh,
+    data = micrac,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+micrac.plot=plot_model(micrac.smf.conneigh.mod, type="int", 
+                       axis.title = c("log SMF","Log RGR"), 
+                       legend.title = "log ConNeigh", title = "")
 
 # Interaction: PC1*HetNeigh(+) and LA*HetNeigh(+)
 alclat=rgr.pca.model[rgr.pca.model$sp_id==2,]
@@ -280,197 +409,257 @@ psyber=rgr.pca.model[rgr.pca.model$sp_id==43,]
 swimac=rgr.pca.model[rgr.pca.model$sp_id==57,]
 swimac.2=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==57,]
 
-alclat.pc1.hetneigh.mod=lm(log_RGR_plus_1~pc_1*log_HetNeigh, alclat)
-alclat.LA.hetneigh.mod=lm(log_RGR_plus_1~log_LA*log_HetNeigh, alclat.2)
-guagui.LA.hetneigh.mod=lm(log_RGR_plus_1~log_LA*log_HetNeigh, guagui)
-psyber.pc1.hetneigh.mod=lm(log_RGR_plus_1~pc_1*log_HetNeigh, psyber)
-swimac.pc1.hetneigh.mod=lm(log_RGR_plus_1~pc_1*log_HetNeigh, swimac)
-swimac.LA.hetneigh.mod=lm(log_RGR_plus_1~log_LA*log_HetNeigh, swimac.2)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(psyber.pc1.hetneigh.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log HetNeigh", title = "")
+alclat.pc1.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+     pc_1*log_HetNeigh,
+    data = alclat,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-# Interaction: SRL x Treatment(-)
-cecsch=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==6,]
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+alclat.pc1.hetneigh.mod.plot=plot_model(alclat.pc1.hetneigh.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "A. latifolia")
+ggsave("alclat.pc1.hetneigh.pdf", height=10, width=12)
 
-cecsch.SRL.trt.mod=lm(log_RGR_plus_1~log_SRL*Treatment_factor, cecsch)
+alclat.LA.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*log_HetNeigh,
+    data = alclat.2,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(cecsch.SRL.trt.mod, type="int", 
-                  axis.title = c("Specific Root Length (SRL)","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "Treatment", title = "")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+alclat.LA.hetneigh.mod.plot=plot_model(alclat.LA.hetneigh.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "A. latifolia")
+ggsave("alclat.LA.hetneigh.pdf", height=10, width=12)
+
+guagui.LA.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*log_HetNeigh,
+    data = guagui,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+guagui.LA.hetneigh.mod.plot=plot_model(guagui.LA.hetneigh.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "G. guidonia")
+ggsave("guagui.LA.hetneigh.pdf", height=10, width=12)
+
+psyber.pc1.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+     pc_1*log_HetNeigh,
+    data = psyber,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+psyber.pc1.hetneigh.mod.plot=plot_model(psyber.pc1.hetneigh.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "P. berteroana")
+ggsave("psyber.PC1.hetneigh.pdf", height=10, width=12)
+
+swimac.pc1.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_HetNeigh,
+    data = swimac,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+swimac.pc1.hetneigh.mod.plot=plot_model(swimac.pc1.hetneigh.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "S. macrophylla")
+ggsave("swimac.PC1.hetneigh.pdf", height=10, width=12)
+
+swimac.LA.hetneigh.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*log_HetNeigh,
+    data = swimac.2,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+swimac.LA.hetneigh.mod.plot=plot_model(swimac.LA.hetneigh.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Heterospecific\nNeighbor Density", title = "S. macrophylla")
+ggsave("swimac.LA.hetneigh.pdf", height=10, width=12)
 
 # Interaction: PC1 x Treatment(+) and LA x Treatment(-)
 cecsch=rgr.pca.model[rgr.pca.model$sp_id==6,]
 guagui=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==19,]
 swimac=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==57,]
 
-cecsch.PC1.trt.mod=lm(log_RGR_plus_1~pc_1*Treatment_factor, cecsch)
-guagui.LA.trt.mod=lm(log_RGR_plus_1~log_LA*Treatment_factor, guagui)
-swimac.LA.trt.mod=lm(log_RGR_plus_1~log_LA*Treatment_factor, swimac)
+cecsch.PC1.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*Treatment_factor,
+    data = cecsch,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+cecsch.PC1.trt.mod.plot=plot_model(cecsch.PC1.trt.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Plots", title = "C. schreberiana")
+ggsave("cecsch.PC1.treatment.pdf", height=10, width=12)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(cecsch.PC1.trt.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "Treatment", title = "")
+guagui.LA.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*Treatment_factor,
+    data = guagui,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+guagui.LA.trt.mod.plot=plot_model(guagui.LA.trt.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Plots", title = "G. guidonia")
+ggsave("guagui.LA.treatment.pdf", height=10, width=12)
+
+swimac.LA.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*Treatment_factor,
+    data = swimac,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+swimac.LA.trt.mod.plot=plot_model(swimac.LA.trt.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Plots", title = "S. macrophylla")
+ggsave("swimac.LA.treatment.pdf", height=10, width=12)
 
 # Interaction: PC1/LA*hetneigh*Treatment(-)
 cecsch=rgr.pca.model[rgr.pca.model$sp_id==6,]
 cecsch.2=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==6,]
 
-cecsch.PC1.hetneigh.trt.mod=lm(log_RGR_plus_1~pc_1*log_HetNeigh*Treatment_factor, cecsch)
-cecsch.LA.hetneigh.trt.mod=lm(log_RGR_plus_1~log_LA*log_HetNeigh*Treatment_factor, cecsch.2)
+cecsch.PC1.hetneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_HetNeigh*Treatment_factor,
+    data = cecsch,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(cecsch.PC1.hetneigh.trt.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log HetNeigh", title = "")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+cecsch.PC1.hetneigh.trt.mod.plot=plot_model(cecsch.PC1.hetneigh.trt.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Heterospecifc\nNeighbor Density", title = "C. schreberiana")
 
-output[[4]]
+ggsave("cecsch.pc1.hetneigh.treatment.pdf", height=10, width=12)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(cecsch.LA.hetneigh.trt.mod, type="int", 
-                  axis.title = c("Leaf Area (LA)","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log HetNeigh", title = "")
+cecsch.LA.hetneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_LA*log_HetNeigh*Treatment_factor,
+    data = cecsch.2,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-output[[4]]
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+cecsch.LA.hetneigh.trt.mod.plot=plot_model(cecsch.LA.hetneigh.trt.mod, type="int", 
+                       axis.title = c("Log Leaf Area (LA)","Log RGR"), 
+                       legend.title = "Log Heterospecifc\nNeighbor Density", title = "C. schreberiana")
+ggsave("cecsch.LA.hetneigh.treatment.pdf", height=10, width=12)
+
 
 # Interaction PC1*ConNeigh*Treatment(+)
 psyber=rgr.pca.model[rgr.pca.model$sp_id==43,]
 hibros=rgr.pca.model[rgr.pca.model$sp_id==22,]
 
-psyber.PC1.conneigh.trt.mod=lm(log_RGR_plus_1~pc_1*log_ConNeigh*Treatment_factor, psyber)
-hibros.PC1.conneigh.trt.mod=lm(log_RGR_plus_1~pc_1*log_ConNeigh*Treatment_factor, hibros)
+psyber.PC1.conneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_ConNeigh*Treatment_factor,
+    data = psyber,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(psyber.PC1.conneigh.trt.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+psyber.PC1.conneigh.trt.mod.plot=plot_model(psyber.PC1.conneigh.trt.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Conspecifc\nNeighbor Density", title = "P. berteroana")
+ggsave("psyber.PC1.conneigh.treatment.pdf", height=10, width=12)
 
-output[[4]]
+hibros.PC1.conneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      pc_1*log_ConNeigh*Treatment_factor,
+    data = hibros,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(hibros.PC1.conneigh.trt.mod, type="int", 
-                  axis.title = c("PC1","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
-
-output[[4]]
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+hibros.PC1.conneigh.trt.mod.plot=plot_model(hibros.PC1.conneigh.trt.mod, type="int", 
+                       axis.title = c("PC1","Log RGR"), 
+                       legend.title = "Log Conspecifc\nNeighbor Density", title = "H. rosa-sinensis")
+ggsave("hibros.PC1.conneigh.treatment.pdf", height=10, width=12)
 
 # Interaction: SMF*Conneight*Trt (+) and SRL*ConNeigh*Trt(-)
 psyber=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==43,]
 
-psyber.SMF.conneigh.trt.mod=lm(log_RGR_plus_1~log_SMF*log_ConNeigh*Treatment_factor, psyber)
-psyber.SRL.conneigh.trt.mod=lm(log_RGR_plus_1~log_SRL*log_ConNeigh*Treatment_factor, psyber)
+psyber.SMF.conneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SMF*log_ConNeigh*Treatment_factor,
+    data = psyber,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(psyber.SMF.conneigh.trt.mod, type="int", 
-                  axis.title = c("Stem Mass Fraction (SMF)","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+psyber.SMF.conneigh.trt.mod.plot=plot_model(psyber.SMF.conneigh.trt.mod, type="int", 
+                       axis.title = c("Log Stem Mass Fraction (SMF)","Log RGR"), 
+                       legend.title = "Log Conspecifc\nNeighbor Density", title = "P. berteroana")
+ggsave("psyber.SMF.conneigh.treatment.pdf", height=10, width=12)
 
-output[[4]]
+psyber.SRL.conneigh.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SRL*log_ConNeigh*Treatment_factor,
+    data = psyber,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(psyber.SRL.conneigh.trt.mod, type="int", 
-                  axis.title = c("Specific Root Length (SRL)","Log Relative Growth Rate (RGR)"), 
-                  legend.title = "log ConNeigh", title = "")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+psyber.SRL.conneigh.trt.mod.plot=plot_model(psyber.SRL.conneigh.trt.mod, type="int", 
+                       axis.title = c("Log Specific Root Length (SRL)","Log RGR"), 
+                       legend.title = "Log Conspecifc\nNeighbor Density", title = "P. berteroana")
 
-output[[4]]
+ggsave("psyber.SRL.conneigh.treatment.pdf", height=10, width=12)
 
-test=allEffects(psyber.SMF.conneigh.trt.mod)
-plot(test)
+# Interaction: SRL x Treatment(-)
+cecsch=rgr.indiv.trait.model[rgr.indiv.trait.model$sp_id==6,]
 
+cecsch.SRL.trt.mod <- 
+  rstanarm::stan_lmer(
+    log_RGR_plus_1 ~ 1 + (1 | plot_id) +(1|Station_id)+
+      log_SRL*Treatment_factor,
+    data = cecsch,
+    iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-
-
-
-
-
-
-
-
-
-
-# Another way to plot interactions
-# find the range of the second term in the interaction
-range(rgr.pca.model$log_HetNeigh)
-# -1.473140, 2.993264
-
-# Calculate the intercept of the min and max values
-# first term is global intercept of model
-# second term is coefficient of second term in interaction
-# multiply by max and min value of second term in interaction
-
-intercept.1=
-
-
-pred <- expand.grid(pc_1=c(min(rgr.pca.model$pc_1),0,max(rgr.pca.model$pc_1)),
-                    log_HetNeigh=c(min(rgr.pca.model$log_HetNeigh),0,max(rgr.pca.model$log_HetNeigh)),
-                    Treatment_2=factor(0:1))
-pred$log_RGR_plus_1 <- predict(pc1.hetneigh.trt.mod,pred)
-
-
-ggplot(rgr.pca.model,aes(x=pc_1,y=log_RGR_plus_1,color=log_HetNeigh))+geom_point()+facet_grid(~Treatment_2)+
-  geom_line(data=pred,aes(group=log_HetNeigh))
-
-
-slope.1=0.191717161
-slope.2=0.191717161+-0.008911660
-slope.3=0.191717161+(0.026413307*-1.473140)
-slope.4=0.191717161+(0.026413307*2.993264)+-0.008911660+(-0.033098700*2.993264)
-
-# Calculate the slope of the min and max values
-# first term is coefficient of first term in interaction
-# second term is coefficient of interaction term 
-# multiply by max and min value of second term in interaction
-
-srl.conneigh.high=rgr.sp.traits.parm[11,2]+rgr.sp.traits.parm[163,2]*3.7325813
-0.1133334
-srl.conneigh.low=rgr.sp.traits.parm[11,2]+rgr.sp.traits.parm[162,2]*-0.7612897
--0.0285517
-
-# Calculate the intercept of the min and max values
-# first term is global intercept of model
-# second term is coefficient of second term in interaction
-# multiply by max and min value of second term in interaction
-
-srl.conneigh.high.int=rgr.sp.traits.parm[1353,2]+rgr.sp.traits.parm[24,2]*3.7325813
--3.982554
-srl.conneigh.low.int=rgr.sp.traits.parm[1353,2]+rgr.sp.traits.parm[24,2]*-0.7612897
--3.848533
-
-# plotting slopes and intercepts
-plot(rgr.indiv.trait.model$log_SRL, rgr.indiv.trait.model$log_RGR_plus_1, type="n", 
-     xlab="Specific Root Length", ylab="Relative Growth Rate")
-abline(-3.982554,0.1133334, col="black", lwd=4)
-abline(-3.848533,-0.0285517, col="blue", lwd=4)
-legend("topright", legend=c("ConNeigh","High", "Low"),
-       col=c("NA","black", "blue"), lty=1, lwd=4)
-
-# another way to plot interactions
-library(effects)
-# have to make lm of each model first and then feed it to allEffects
-rgr.srl.cn=lm(log_RGR_plus_1~log_SRL*log_ConNeigh, rgr.indiv.trait.model)
-rgr.srl.cn.effects=allEffects(rgr.srl.cn)
-plot(rgr.srl.cn.effects, xlab="Log Specific Root Length (SRL)", ylab="Log Relative Growth Rate (RGR)", 
-     main="RGR ~ SRL*Conspecific Neighbor Density")
-
-# another plotting method 
-library(emmeans)
-mean(rgr.indiv.trait.model$log_ConNeigh)
-range(rgr.indiv.trait.model$log_ConNeigh)
-# -0.7612897, 3.7325813
-mylist <- list(log_ConNeigh=c(-0.7612897, -2.504319e-11 ,3.7325813)) 
-emtrends(rgr.srl.cn, ~log_ConNeigh, var="log_SRL",at=mylist)
-
-mylist.2 <- list(log_SRL=seq(-6,4, by=1),log_ConNeigh=c(-0.7612897, -2.504319e-11 ,3.7325813)) 
-emmip(rgr.srl.cn,log_ConNeigh~log_SRL,at=mylist.2, CIs=TRUE)
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+cecsch.SRL.trt.mod.plot=plot_model(cecsch.SRL.trt.mod, type="int", 
+                       axis.title = c("Log Specific Root Length (SRL)","Log RGR"), 
+                       legend.title = "Plots", title = "C. schreberiana")
+ggsave("cecsch.SRL.treatment.pdf", height=10, width=12)
 
 #### Correlate plot-level RGR with plot-level SR for each SR census ####
 
 cor.df=read.csv("RGR.SR.correlation.csv", header=T, row.names=1)
+test=cor.df[c(1:28,30:40,42:62,64:75),]
 
 # Control Plots
 cor.test(cor.df[,1], cor.df[,2]) # r = 0.19 p = 0.12
@@ -487,6 +676,22 @@ cor.test(cor.df[,1], cor.df[,12])# r = -0.02 p = 0.89
 cor.test(cor.df[,1], cor.df[,13])# r = 0.01 p = 0.92
 cor.test(cor.df[,1], cor.df[,14])# r = -0.32 p = 0.007
 
+# with logged values
+cor.test(log(cor.df[,1]), log(cor.df[,2])) # r = 0.15 p = 0.22
+cor.test(log(cor.df[,1]+1), log(cor.df[,3]+1)) # r = -0.18 p = 0.13
+cor.test(log(cor.df[,1]), log(cor.df[,4]))# r = -0.26 p = 0.03
+cor.test(log(cor.df[,1]), log(cor.df[,5]))# r = -0.06 p = 0.62
+cor.test(log(cor.df[,1]), log(cor.df[,6]))# r = -0.08 p = 0.51
+cor.test(log(cor.df[,1]), log(cor.df[,7]))# r = -0.04 p = 0.76
+cor.test(log(cor.df[,1]), log(cor.df[,8]))# r = -0.21 p = 0.08
+cor.test(log(cor.df[,1]), log(cor.df[,9]))# r = 0.19 p = 0.11
+cor.test(log(cor.df[,1]), log(cor.df[,10]))# r = 0.02 p = 0.87
+cor.test(log(cor.df[,1]), log(cor.df[,11]))# r = -0.36 p = 0.002
+cor.test(log(cor.df[,1]), log(cor.df[,12]))# r = -0.00002 p = 0.99
+cor.test(log(cor.df[,1]), log(cor.df[,13]))# r = -0.04 p = 0.76
+cor.test(log(cor.df[,1]), log(cor.df[,14]))# r = -0.30 p = 0.01
+
+
 # Treatment Plots
 cor.test(cor.df[,15], cor.df[,16]) # r = -0.36 p = 0.002
 cor.test(cor.df[,15], cor.df[,17]) # r = -0.32 p = 0.006
@@ -501,4 +706,160 @@ cor.test(cor.df[,15], cor.df[,25])# r = 0.23 p = 0.05
 cor.test(cor.df[,15], cor.df[,26])# r = 0.12 p = 0.31
 cor.test(cor.df[,15], cor.df[,27])# r = 0.009 p = 0.94
 cor.test(cor.df[,15], cor.df[,28])# r = -0.22 p = 0.06
+
+# with logged values
+cor.test(log(cor.df[,15]), log(cor.df[,16])) # r = -0.29 p = 0.02
+cor.test(log(cor.df[,15]+1), log(cor.df[,17]+1)) # r = -0.32  p = 0.005
+cor.test(log(cor.df[,15]), log(cor.df[,18]))# r = -0.25 p = 0.04
+cor.test(log(cor.df[,15]), log(cor.df[,19]))# r = -0.18 p = 0.13
+cor.test(log(cor.df[,15]), log(cor.df[,20]))# r = -0.0006 p = 0.99
+cor.test(log(cor.df[,15+1]), log(cor.df[,21+1]))# r = -0.05 p = 0.69
+cor.test(log(cor.df[,15]), log(cor.df[,22]))# r = -0.15 p = 0.21
+cor.test(log(cor.df[,15]), log(cor.df[,23]))# r = -0.08 p = 0.48
+cor.test(log(cor.df[,15]), log(cor.df[,24]))# r = 0.05 p = 0.64
+cor.test(log(cor.df[,15]), log(cor.df[,25]))# r = 0.25 p = 0.03
+cor.test(log(cor.df[,15]), log(cor.df[,26]))# r = 0.09 p = 0.48
+cor.test(log(cor.df[,15]), log(cor.df[,27]))# r = -0.03 p = 0.80
+cor.test(log(cor.df[,15]), log(cor.df[,28]))# r = -0.18 p = 0.14
+
+#### Figures ####
+
+Figure.3 = plot_grid(hibros.pc1.conneigh.mod.plot,spomom.LA.conneigh.mod.plot,hibros.smf.conneigh.mod.plot,
+                     schmor.smf.conneigh.mod.plot,alclat.pc1.hetneigh.mod.plot,psyber.pc1.hetneigh.mod.plot,
+                     ncol=2, nrow=3, labels = c("A.","B.","C.","D.","E.","F."))
+
+ggsave("Figure3.pdf", height = 10, width = 12)
+
+Figure.4 = plot_grid(cecsch.PC1.trt.mod.plot, cecsch.PC1.hetneigh.trt.mod.plot[[4]],hibros.PC1.conneigh.trt.mod.plot[[4]],
+                     psyber.SMF.conneigh.trt.mod.plot[[4]],cecsch.SRL.trt.mod.plot,labels = c("A.","B.","C.","D.","E."),
+                     ncol=2, nrow=3)
+
+ggsave("Figure4.pdf", height = 10, width = 12)
+
+Figure.S1 = plot_grid(schmor.pc1.conneigh.mod.plot,alclfo.pc1.conneigh.mod.plot,alclfo.smf.conneigh.mod.plot,
+                      guagui.smf.conneigh.mod.plot,alclat.LA.hetneigh.mod.plot,guagui.LA.hetneigh.mod.plot,
+                      swimac.LA.hetneigh.mod.plot,labels = c("A.","B.","C.","D.","E.","F.","G."),ncol=2, nrow=4)
+
+ggsave("Figure.S1.pdf", height = 10, width = 12)
+
+Figure.S2 = plot_grid(swimac.LA.trt.mod.plot,guagui.LA.trt.mod.plot,psyber.PC1.conneigh.trt.mod.plot[[4]],
+                      psyber.SRL.conneigh.trt.mod.plot[[4]],labels = c("A.","B.","C.","D."),ncol=2, nrow=2)
+
+ggsave("Figure.S2.pdf", height = 10, width = 12)
+
+#### Determining mean growth rates per plot ####
+
+G.300.RGR=read.csv("300.Green.RGR.csv", header=T)
+R.300.RGR=read.csv("300.Red.RGR.csv", header=T)
+G.400.RGR=read.csv("400.Green.RGR.csv", header=T)
+R.400.RGR=read.csv("400.Red.RGR.csv", header=T)
+G.500.RGR=read.csv("500.Green.RGR.csv", header=T)
+R.500.RGR=read.csv("500.Red.RGR.csv", header=T)
+
+# repeat for each plot
+mean((subset(G.300.RGR, G.300.RGR$Station == 1,))$RGR)
+mean((subset(R.300.RGR, R.300.RGR$Station == 1,))$RGR)
+mean((subset(G.400.RGR, G.400.RGR$Station == 1,))$RGR) # no station 4
+mean((subset(R.400.RGR, R.400.RGR$Station == 1,))$RGR) # no station 4, eliminate station 16 because only have Green data
+mean((subset(G.500.RGR, G.500.RGR$Station == 1,))$RGR)
+mean((subset(R.500.RGR, R.500.RGR$Station == 1,))$RGR) # no station 13
+
+
+#### T.test for RGR ####
+
+all.rgr=read.csv("All.RGR.csv",header=T)
+# plots 400.4, 400.16, 500.13 removed because no individuals survived so RGR is NaN
+
+# standard t.test of all plot means for all elevations
+# running t.test with rgr not logged and log()
+
+test.1=all.rgr[c(1:72),c(1:3)] # subset to get columns needed
+
+t.test(log(test.1$Green.all), log(test.1$Red.all)) # logged RGR
+# t = -0.31811, df = 140.91, p = 0.7509
+# mean Green = -2.400922
+# mean Red = -2.371441
+
+t.test(test.1$Green.all, test.1$Red.all)
+# t = -0.12687, df = 141.97, p = 0.8992
+# mean Green = 0.1055484
+# mean Red = 0.1067318
+
+# t.test for each elevation separately
+#300
+t.test(all.rgr[1:25,2], all.rgr[1:25,3])
+# t = -1.4251, df = 42.304, p = 0.1615
+# mean Green = 0.06238131
+# mean Red = 0.07561301
+
+t.test(log(all.rgr[1:25,2]), log(all.rgr[1:25,3]))
+# t = -1.2625, df = 46.208, p = 0.2131
+# mean Green = -2.849520
+# mean Red = -2.692993
+
+#400
+t.test(all.rgr[26:48,2], all.rgr[26:48,3])
+# t = 1.2156, df = 42.93, p = 0.2308
+# mean Green = 0.11243465
+# mean Red = 0.09631597
+
+t.test(log(all.rgr[26:48,2]), log(all.rgr[26:48,3]))
+# t = 1.2434, df = 43.889, p = 0.2203
+# mean Green = -2.268793
+# mean Red = -2.420914
+
+#500
+t.test(all.rgr[49:72,2], all.rgr[49:72,3])
+# t = -0.31504, df = 45.996, p = 0.7542
+# mean Green = 0.1439147
+# mean Red = 0.1491290
+
+t.test(log(all.rgr[49:72,2]), log(all.rgr[49:72,3]))
+# t = -0.4685, df = 43.229, p = 0.6418
+# mean Green = -2.060256
+# mean Red = -1.989079
+
+# Plot of RGR values for treatments overall and by elevations
+
+all.rgr.2=all.rgr[,c(2,3,10,11,14,15,18,19)]
+all.rgr.3=melt(all.rgr.2)
+rgr.boxplot=ggplot(all.rgr.3, aes(y=value, x=variable))+
+  geom_boxplot(aes(fill=variable),show.legend = FALSE)+
+  geom_point()+
+  labs(title="",x="", y = "Mean Plot Relative Growth Rate")+
+  scale_x_discrete(labels=c("All:C","All:T","300m:C","300m:T","400m:C","400m:T","500m:C","500m:T"))+
+  theme_classic(base_size = 15)+
+  scale_fill_manual(values=c("#548F01","#DB4743","#548F01","#DB4743","#548F01","#DB4743","#548F01","#DB4743"))
+
+
+
+
+rgr.boxplot=boxplot(all.rgr[,c(2,3,10,11,14,15,18,19)], ylab="Mean Plot Relative Growth Rate", cex.axis = 1.50,cex.lab=1.5,
+        names=c("All:C","All:T","300m:C","300m:T","400m:C","400m:T","500m:C","500m:C"))
+rgr.recorded <- recordPlot()
+
+# Plot SR overall and each elevation by treatment
+all.SR=read.csv("Elev.SR.csv", header=T, row.names=1)
+all.SR.melt=melt(all.SR)
+
+all.SR.melt$value.2=log(all.SR.melt$value)
+
+sr.boxplot=ggplot(all.SR.melt, aes(y=value, x=variable))+
+  geom_boxplot(aes(fill=variable),show.legend = FALSE)+
+  geom_point()+
+  labs(title="",x="", y = "Mean Plot Survival Rate")+
+  scale_x_discrete(labels=c("All:C","All:T","300m:C","300m:T","400m:C","400m:T","500m:C","500m:T"))+
+  theme_classic(base_size = 15)+
+  scale_fill_manual(values=c("#548F01","#DB4743","#548F01","#DB4743","#548F01","#DB4743","#548F01","#DB4743"))
+
+# Figure 1
+
+Figure1=plot_grid(rgr.boxplot,sr.boxplot, labels = c("A.","B."))
+
+
+# Plot of RGR at the individual level for each elevation and treatment
+
+indiv.rgr=read.csv("All.Indiv.RGR.csv", header=T)
+boxplot(indiv.rgr, ylab="Individual Relative Growth Rate")
+
 

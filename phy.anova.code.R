@@ -23,6 +23,10 @@ all.rgr=read.csv("All.RGR.csv",header=T)
 
 # standard t.test of all plot means for all elevations
 
+test.1=all.rgr[c(1:72),c(1:3)]
+
+t.test(log(test.1$Green.all), log(test.1$Red.all))
+
 t.test(all.rgr$Green.all, all.rgr$Red.all)
 # t = -0.12687, df = 141.97, p = 0.8992
 # mean Green = 0.1055484

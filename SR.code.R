@@ -1,3 +1,8 @@
+library(sjPlot)
+library(ggplot2)
+library(rstanarm)
+library(cowplot)
+
 #### Determining total number of individuals censused ####
 
 SR.G300=read.csv("300.Green.SR.csv")
@@ -40,6 +45,11 @@ t.test(all.SR$Green.All, all.SR$Red.All)
 # mean Green = 9650677
 # mean Red = 0.9649270 
 
+t.test(log(all.SR$Green.All), log(all.SR$Red.All))
+# t = 0.010789, df = 21.973, p = 0.9915
+# mean Green = -0.03591148
+# mean Red = -0.03603227 
+
 # t.test for each elevation separately
 #300
 t.test(all.SR$Green.300, all.SR$Red.300)
@@ -47,17 +57,32 @@ t.test(all.SR$Green.300, all.SR$Red.300)
 # mean Green = 0.9687378
 # mean Red = 0.9782805
 
+t.test(log(all.SR$Green.300), log(all.SR$Red.300))
+# t = -0.7811, df = 19.566, p = 0.4441
+# mean Green = -0.03237355
+# mean Red = -0.02225296
+
 #400
 t.test(all.SR$Green.400, all.SR$Red.400)
 # t = -0.0047536, df = 21.963, p = 0.9963
 # mean Green = 0.9536385
 # mean Red = 0.9537038
 
+t.test(log(all.SR$Green.400), log(all.SR$Red.400))
+# t = -0.0014928, df = 21.964, p = 0.9988
+# mean Green = -0.04802327
+# mean Red = -0.04800161
+
 #500
 t.test(all.SR$Green.500, all.SR$Red.500)
 # t = 0.94366, df = 21.66, p = 0.3558
 # mean Green = 0.9728269
 # mean Red = 0.9627966
+
+t.test(log(all.SR$Green.500), log(all.SR$Red.500))
+# t = 0.94486, df = 21.568, p = 0.3552
+# mean Green = -0.02783760
+# mean Red = -0.03829512 
 
 ### Making SR df ready for model ####
 
@@ -128,7 +153,7 @@ sig.pos.=dec.jan.parm[dec.jan.parm$X2.50. > 0 & dec.jan.parm$X97.50. > 0,]
 setwd("/Users/samanthaworthy/Desktop/Biotic.Impacts/Data")
 feb_mar.data=read.csv("survival.Feb.Mar.csv", row.names = 1)
 feb_mar.data$Treatment_factor=as.factor(feb_mar.data$Treatment_factor)
-drygla=subset(feb_mar.data, feb_mar.data$species=="DRYGLA")
+dacexc=subset(feb_mar.data, feb_mar.data$species=="DACEXC")
 slober=subset(feb_mar.data, feb_mar.data$species=="SLOBER")
 swimac=subset(feb_mar.data, feb_mar.data$species=="SWIMAC")
 may_june.data=read.csv("survival.May.June.csv", row.names = 1)
@@ -140,22 +165,110 @@ nov_dec.data$Treatment_factor=as.factor(nov_dec.data$Treatment_factor)
 
 # Interaction: ConNeigh*Treatment
 
-feb.mar.conneigh.trt.mod=glm(survival~log_ConNeigh*Treatment_factor, feb_mar.data, family = binomial)
-drygla.conneigh.trt.mod=glm(survival~log_ConNeigh*Treatment_factor, drygla,family = binomial)
-slober.conneigh.trt.mod=glm(survival~log_ConNeigh*Treatment_factor, slober,family = binomial)
-swimac.conneigh.trt.mod=glm(survival~log_ConNeigh*Treatment_factor, swimac,family = binomial)
+# ConNeight x Trt
 
-set_theme(base = theme_classic(), axis.title.size = 1.5, axis.textcolor = "black")
-output=plot_model(drygla.conneigh.trt.mod, type="int",
-                  axis.title = c("Log Conspecific Neighbor Density","Survival Probability"), 
-                  legend.title = "Treatment", title = "")
+conneigh.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|sp_id) + (1|station_id) +
+                        log_ConNeigh*Treatment_factor,
+                data = feb_mar.data, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+conneigh.trt.mod.plot=plot_model(conneigh.trt.mod, type="int",
+                                 axis.title = c("Log Conspecifc Neighbor Density","Survival Probability"), 
+                                 legend.title = "Plots", title = "")
+
+ggsave("conneigh.trt.mod.plot.pdf", height=10, width=12)
+
+dacexc.conneigh.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|station_id) +
+                        log_ConNeigh*Treatment_factor,
+                data = dacexc, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+dacexc.conneigh.trt.mod.plot=plot_model(dacexc.conneigh.trt.mod, type="int",
+                                 axis.title = c("Log Conspecifc Neighbor Density","Survival Probability"), 
+                                 legend.title = "Plots", title = "D. excelsa")
+
+ggsave("dacexc.conneigh.trt.mod.plot.pdf", height=10, width=12)
+
+slober.conneigh.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|station_id) +
+                        log_ConNeigh*Treatment_factor,
+                data = slober, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+slober.conneigh.trt.mod.plot=plot_model(slober.conneigh.trt.mod, type="int",
+                                        axis.title = c("Log Conspecifc Neighbor Density","Survival Probability"), 
+                                        legend.title = "Plots", title = "S. berteroana")
+
+ggsave("slober.conneigh.trt.mod.plot.pdf", height=10, width=12)
+
+swimac.conneigh.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|station_id) +
+                        log_ConNeigh*Treatment_factor,
+                data = swimac, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+swimac.conneigh.trt.mod.plot=plot_model(swimac.conneigh.trt.mod, type="int",
+                                        axis.title = c("Log Conspecifc Neighbor Density","Survival Probability"), 
+                                        legend.title = "Plots", title = "S. macrophylla")
+
+ggsave("swimac.conneigh.trt.mod.plot.pdf", height=10, width=12)
+
+Figure.S3=plot_grid(swimac.conneigh.trt.mod.plot,dacexc.conneigh.trt.mod.plot,slober.conneigh.trt.mod.plot,
+                    labels = c("A.","B.","C."))
+
+ggsave("FigureS3.pdf", height = 10, width = 12)
 
 # Model: survival probability~treatment
 
-may_june.trt=glm(survival~Treatment_factor, may_june.data, family = binomial)
-sept_oct.trt=glm(survival~Treatment_factor, sept_oct.data, family = binomial)
-nov_dec.trt=glm(survival~Treatment_factor, nov_dec.data, family = binomial)
+may_june.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|sp_id) + (1|station_id) +
+                        Treatment_factor,
+                data = may_june.data, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
 
-output=plot_model(may_june.trt, type = "slope")
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+may_june.trt.mod.plot=plot_model(may_june.trt.mod, type="pred", terms = "Treatment_factor",
+                                 axis.title = c("Plots","Survival Probability"), 
+                                 title = "")
 
-plot(allEffects(nov_dec.trt))
+sept_oct.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|sp_id) + (1|station_id) +
+                        Treatment_factor,
+                data = sept_oct.data, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+sept_oct.trt.mod.plot=plot_model(sept_oct.trt.mod, type="pred", terms = "Treatment_factor",
+                                 axis.title = c("Plots","Survival Probability"), 
+                                 title = "")
+
+nov_dec.trt.mod <- 
+        rstanarm::stan_glmer(
+                survival ~ 1 + (1 | plot_id) + (1|sp_id) + (1|station_id) +
+                        Treatment_factor,
+                data = nov_dec.data, family=binomial(link = "logit"),
+                iter = 4000, warmup = 1000, chains = 4, cores = 4)
+
+set_theme(base = theme_classic(base_size = 15), axis.textcolor = "black",legend.title.size = .8,
+          axis.title.color = "black", legend.title.color = "black")
+nov_dec.trt.mod.plot=plot_model(nov_dec.trt.mod, type="pred", terms = "Treatment_factor",
+                                 axis.title = c("Plots","Survival Probability"), 
+                                 title = "")
